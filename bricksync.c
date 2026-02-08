@@ -428,9 +428,7 @@ bsContext *bsInit( char *statepath, int *retstateloaded )
   ioPrintf( &context->output, IO_MODEBIT_LOGONLY, "LOG: Resolved %s as %s\n", BS_BRICKLINK_WEB_SERVER, context->bricklink.webaddress );
   if( context->bricklink.brickstoretoken )
   {
-    context->bricklink.accountaddress = tcpResolveName( BS_BRICKLINK_ACCOUNT_SERVER, 0 );
-    if( !( context->bricklink.accountaddress ) )
-      ioPrintf( &context->output, IO_MODEBIT_FLUSH, BSMSG_WARNING "Failed to resolve IP address for " IO_RED "%s" IO_WHITE " (BrickStore inventory fallback disabled).\n", BS_BRICKLINK_ACCOUNT_SERVER );
+    context->bricklink.accountaddress = strdup( BS_BRICKLINK_ACCOUNT_SERVER );
     else
       ioPrintf( &context->output, IO_MODEBIT_LOGONLY, "LOG: Resolved %s as %s\n", BS_BRICKLINK_ACCOUNT_SERVER, context->bricklink.accountaddress );
   }
@@ -465,7 +463,7 @@ bsContext *bsInit( char *statepath, int *retstateloaded )
   context->bricklink.webhttp = httpOpen( &context->tcp, context->bricklink.webaddress, 80, HTTP_CONNECTION_FLAGS_KEEPALIVE | HTTP_CONNECTION_FLAGS_PIPELINING );
   if( ( context->bricklink.brickstoretoken ) && ( context->bricklink.accountaddress ) )
   {
-    context->bricklink.webhttpshttp = httpOpen( &context->tcp, context->bricklink.webaddress, 443, HTTP_CONNECTION_FLAGS_KEEPALIVE | HTTP_CONNECTION_FLAGS_PIPELINING | HTTP_CONNECTION_FLAGS_SSL );
+    context->bricklink.webhttpshttp = httpOpen( &context->tcp, BS_BRICKLINK_WEB_SERVER, 443, HTTP_CONNECTION_FLAGS_KEEPALIVE | HTTP_CONNECTION_FLAGS_PIPELINING | HTTP_CONNECTION_FLAGS_SSL );
     context->bricklink.accounthttp = httpOpen( &context->tcp, context->bricklink.accountaddress, 443, HTTP_CONNECTION_FLAGS_KEEPALIVE | HTTP_CONNECTION_FLAGS_PIPELINING | HTTP_CONNECTION_FLAGS_SSL );
   }
   context->brickowl.http = httpOpen( &context->tcp, context->brickowl.apiaddress, 443, HTTP_CONNECTION_FLAGS_KEEPALIVE | HTTP_CONNECTION_FLAGS_PIPELINING | HTTP_CONNECTION_FLAGS_SSL );

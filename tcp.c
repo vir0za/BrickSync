@@ -598,6 +598,9 @@ static int tcpResolveNameAddr( char *address, int listenflag, in_addr_t *retaddr
   in_addr_t ip;
   struct addrinfo hints;
   struct addrinfo *addrhost;
+  struct addrinfo *ai;
+  int count, sel;
+  static uint32_t rr = 0;
 
   DEBUG_SET_TRACKER();
 
@@ -611,33 +614,29 @@ static int tcpResolveNameAddr( char *address, int listenflag, in_addr_t *retaddr
   retval = 0;
   if( !( getaddrinfo( address, 0, &hints, &addrhost ) ) )
   {
+    count = 0;
+    for( ai = addrhost ; ai ; ai = ai->ai_next )
+      count++;
+
+    if( count > 0 )
     {
-      struct addrinfo *ai;
-      int count = 0;
-      static uint32_t rr = 0;
+      sel = (int)( rr++ % (uint32_t)count );
+      ai = addrhost;
+      while( ( sel-- > 0 ) && ( ai->ai_next ) )
+        ai = ai->ai_next;
 
-      for( ai = addrhost ; ai ; ai = ai->ai_next )
-        count++;
-
-      if( count > 0 )
-      {
-        int sel = (int)( rr++ % (uint32_t)count );
-        ai = addrhost;
-        while( ( sel-- > 0 ) && ( ai->ai_next ) )
-          ai = ai->ai_next;
-
-        ip = ( (struct sockaddr_in *)ai->ai_addr )->sin_addr.s_addr;
-        retval = 1;
-      }
-
-      freeaddrinfo( addrhost );
+      ip = ( (struct sockaddr_in *)ai->ai_addr )->sin_addr.s_addr;
+      retval = 1;
     }
+
+    freeaddrinfo( addrhost );
   }
 
   *retaddr = ip;
   return retval;
 }
 #else
+
 static int tcpResolveNameAddr( char *address, int listenflag, in_addr_t *retaddr )
 {
   in_addr_t ip;
