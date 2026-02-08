@@ -1,7 +1,9 @@
 “This is a fork of BrickSync by Alexis Naveros. This fork adds a BrickLink closed-store inventory fallback.”
 
-##Support this fork
+## Support this fork
+
 [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/legostuff)
+
 
 The BrickOwl/BrickLink synchronization software, BrickSync, is now open source!
 http://www.bricksync.net/
