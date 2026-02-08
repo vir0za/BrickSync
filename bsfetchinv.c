@@ -458,6 +458,9 @@ static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *bod
 
     bsxClearItem( &item );
 
+    /* STOCKROOM flag (BrickLink Stockroom A items should not be synced to BrickOwl) */
+    int stockroomflag = 0;
+
     /* ITEMID -> id (string) */
     if( ( s = ccStrFindStrSkip( itemstart, "<ITEMID>" ) ) )
     {
@@ -552,6 +555,18 @@ static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *bod
         bsBrickLinkXmlParseCharSpan( v, vlen, &item.condition );
     }
 
+    /* STOCKROOM (Stockroom A items) */
+    if( ( s = ccStrFindStrSkip( itemstart, "<STOCKROOM>" ) ) )
+    {
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</STOCKROOM>", &v, &vlen ) )
+      {
+        if( ( vlen > 0 ) && ( ( v[0] == 'Y' ) || ( v[0] == 'y' ) || ( v[0] == '1' ) ) )
+          stockroomflag = 1;
+      }
+    }
+
     /* DESCRIPTION -> comments (decode entities) */
     decoded = 0;
     tmpstr = 0;
@@ -600,8 +615,11 @@ static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *bod
         }
       }
 
-      bsxVerifyItem( &item );
-      bsxAddCopyItem( inv, &item );
+      if( !( stockroomflag ) )
+      {
+        bsxVerifyItem( &item );
+        bsxAddCopyItem( inv, &item );
+      }
 
       /* Free temporary allocations (bsxAddCopyItem deep-copies strings) */
       if( item.id )
