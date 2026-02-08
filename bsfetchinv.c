@@ -288,7 +288,7 @@ static int bsBrickLinkBrickStoreAuthenticate( bsContext *context )
     );
 
     reply = bsAllocReply( context, BS_QUERY_TYPE_OTHER, 0, 0, 0 );
-    httpAddQuery( context->bricklink.accounthttp, querystring, HTTP_QUERY_FLAGS_RETRY, (void *)reply, bsBrickLinkReplyBrickStoreAuth );
+    httpAddQuery( context->bricklink.accounthttp, querystring, ccStrLen( querystring ), HTTP_QUERY_FLAGS_RETRY, (void *)reply, bsBrickLinkReplyBrickStoreAuth );
     free( querystring );
 
     /* Wait until all queries are processed */
@@ -323,7 +323,7 @@ static char *bsBrickLinkXmlReadString( char **readvalue, char *string, const cha
   char *end;
   if( !( string ) )
     return 0;
-  end = ccStrFindStr( string, close );
+  end = ccStrFindStr( string, (char *)close );
   if( !( end ) )
   {
     *readvalue = 0;
@@ -586,7 +586,7 @@ static bsxInventory *bsQueryBrickLinkInventoryBrickStoreFallback( bsContext *con
     );
 
     reply = bsAllocReply( context, BS_QUERY_TYPE_WEBBRICKLINK, 0, 0, (void *)inv );
-    httpAddQuery( context->bricklink.webhttpshttp, querystring, HTTP_QUERY_FLAGS_RETRY, (void *)reply, bsBrickLinkReplyInventoryWebXml );
+    httpAddQuery( context->bricklink.webhttpshttp, querystring, ccStrLen( querystring ), HTTP_QUERY_FLAGS_RETRY, (void *)reply, bsBrickLinkReplyInventoryWebXml );
     free( querystring );
 
     /* Wait until all queries are processed */
