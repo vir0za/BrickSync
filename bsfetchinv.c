@@ -632,6 +632,12 @@ static void bsBrickLinkReplyInventoryWebXml( void *uservalue, int resultcode, ht
       reply->result = HTTP_RESULT_PARSE_ERROR;
       bsStoreError( context, "BrickLink invExcelFinal Parse Error", response->header, response->headerlength, response->body, response->bodysize );
     }
+    else if( ( inv->itemcount ) && !( inv->partcount ) )
+    {
+      ccFileStore( BS_GLOBAL_PATH "invExcelFinal-last.xml", response->body, response->bodysize, 0 );
+      ioPrintf( &context->output, 0, BSMSG_WARNING "BrickStore fallback returned %d lots but 0 total quantity; dumped raw response to \"" BS_GLOBAL_PATH "invExcelFinal-last.xml\".
+", inv->itemcount );
+    }
   }
 
   mmListDualAddLast( &context->replylist, reply, offsetof(bsQueryReply,list) );
@@ -661,7 +667,7 @@ static bsxInventory *bsQueryBrickLinkInventoryBrickStoreFallback( bsContext *con
   bsTrackerInit( &tracker, context->bricklink.webhttpshttp );
 
   /* Same POST body BrickStore uses */
-  formbody = ccStrAllocPrintf( "itemType=&catID=&colorID=&invNew=&itemYear=&viewType=x&invStock=Y&invStockOnly=&invQty=&invQtyMin=0&invQtyMax=0&invBrikTrak=&invDesc=" );
+  formbody = ccStrAllocPrintf( "itemType=&catID=&colorID=&invNew=&itemYear=&viewType=x&invStock=Y&invStockOnly=&invQty=&invQtyMin=&invQtyMax=&invBrikTrak=&invDesc=" );
   bodylen = (int)strlen( formbody );
 
   ioPrintf( &context->output, IO_MODEBIT_FLUSH, BSMSG_INFO "Fetching BrickLink inventory via BrickStore authenticated web endpoint...\n" );
@@ -751,7 +757,7 @@ bsxInventory *bsQueryBrickLinkFullState( bsContext *context, bsOrderList *orderl
       bsxInventory *altinv = bsQueryBrickLinkInventoryBrickStoreFallback( context );
       if( altinv )
       {
-        if( altinv->itemcount - altinv->itemfreecount )
+        if( ( altinv->itemcount - altinv->itemfreecount ) && ( altinv->partcount ) )
         {
           bsxFreeInventory( inv );
           inv = altinv;
