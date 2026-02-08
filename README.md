@@ -1,3 +1,5 @@
+“This is a fork of BrickSync by Alexis Naveros. This fork adds a BrickLink closed-store inventory fallback.”
+
 The BrickOwl/BrickLink synchronization software, BrickSync, is now open source!
 http://www.bricksync.net/
 
