@@ -318,7 +318,7 @@ static int bsBrickLinkBrickStoreAuthenticate( bsContext *context )
 }
 
 
-static char *bsBrickLinkXmlReadString( char **readvalue, char *string, const char *close )
+static int bsBrickLinkXmlGetSpan( char *string, const char *close, char **ret_start, int *ret_len )
 {
   char *end;
   if( !( string ) )
@@ -326,23 +326,114 @@ static char *bsBrickLinkXmlReadString( char **readvalue, char *string, const cha
   end = ccStrFindStr( string, (char *)close );
   if( !( end ) )
   {
-    *readvalue = 0;
+    if( ret_start )
+      *ret_start = 0;
+    if( ret_len )
+      *ret_len = 0;
     return 0;
   }
-  if( end == string )
-    *readvalue = 0;
-  else
-  {
-    *readvalue = string;
-    end[0] = 0;
-  }
-  return end + strlen( close );
+  if( ret_start )
+    *ret_start = string;
+  if( ret_len )
+    *ret_len = (int)( end - string );
+  return 1;
 }
+
+static char *bsBrickLinkXmlCopySpan( char *start, int len )
+{
+  char *s;
+  if( !( start ) || ( len <= 0 ) )
+    return 0;
+  s = malloc( (size_t)len + 1 );
+  memcpy( s, start, (size_t)len );
+  s[len] = 0;
+  return s;
+}
+
+static int bsBrickLinkXmlParseIntSpan( char *start, int len, int *out_value )
+{
+  char tmp[64];
+  int n;
+  if( !( out_value ) )
+    return 0;
+  if( !( start ) || ( len <= 0 ) )
+  {
+    *out_value = 0;
+    return 1;
+  }
+  n = len;
+  if( n > 63 )
+    n = 63;
+  memcpy( tmp, start, (size_t)n );
+  tmp[n] = 0;
+  *out_value = (int)strtol( tmp, 0, 10 );
+  return 1;
+}
+
+static int bsBrickLinkXmlParseInt64Span( char *start, int len, int64_t *out_value )
+{
+  char tmp[64];
+  int n;
+  if( !( out_value ) )
+    return 0;
+  if( !( start ) || ( len <= 0 ) )
+  {
+    *out_value = 0;
+    return 1;
+  }
+  n = len;
+  if( n > 63 )
+    n = 63;
+  memcpy( tmp, start, (size_t)n );
+  tmp[n] = 0;
+  *out_value = (int64_t)strtoll( tmp, 0, 10 );
+  return 1;
+}
+
+static int bsBrickLinkXmlParseFloatSpan( char *start, int len, float *out_value )
+{
+  char tmp[64];
+  int n;
+  if( !( out_value ) )
+    return 0;
+  if( !( start ) || ( len <= 0 ) )
+  {
+    *out_value = 0.0f;
+    return 1;
+  }
+  n = len;
+  if( n > 63 )
+    n = 63;
+  memcpy( tmp, start, (size_t)n );
+  tmp[n] = 0;
+  *out_value = (float)strtod( tmp, 0 );
+  return 1;
+}
+
+static int bsBrickLinkXmlParseCharSpan( char *start, int len, char *out_value )
+{
+  if( !( out_value ) )
+    return 0;
+  *out_value = 0;
+  if( !( start ) || ( len <= 0 ) )
+    return 1;
+  while( ( len > 0 ) && ( (unsigned char)*start <= ' ' ) )
+  {
+    start++;
+    len--;
+  }
+  if( len > 0 )
+    *out_value = start[0];
+  return 1;
+}
+
 
 static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *body, size_t bodysize, ioLog *log )
 {
-  char *buf, *p, *itemstart, *itemend, *s;
+  char *buf, *p, *itemstart, *itemend, *s, *v;
+  int vlen;
   bsxItem item;
+  char *tmpstr;
   char *decoded;
   int decodedlen;
 
@@ -367,108 +458,119 @@ static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *bod
 
     bsxClearItem( &item );
 
-    /* Simple fields */
+    /* ITEMID -> id (string) */
     if( ( s = ccStrFindStrSkip( itemstart, "<ITEMID>" ) ) )
     {
-      if( bsBrickLinkXmlReadString( &item.id, s, "</ITEMID>" ) )
-        ;
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</ITEMID>", &v, &vlen ) )
+        item.id = bsBrickLinkXmlCopySpan( v, vlen );
     }
+
+    /* ITEMTYPE -> typeid (single char) */
     if( ( s = ccStrFindStrSkip( itemstart, "<ITEMTYPE>" ) ) )
     {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</ITEMTYPE>" ) )
-      {
-        if( ( v ) && ( v[0] ) )
-          item.typeid = v[0];
-      }
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</ITEMTYPE>", &v, &vlen ) )
+        bsBrickLinkXmlParseCharSpan( v, vlen, &item.typeid );
     }
+
+    /* COLOR */
     if( ( s = ccStrFindStrSkip( itemstart, "<COLOR>" ) ) )
     {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</COLOR>" ) )
-      {
-        if( v )
-          item.colorid = (int)strtol( v, 0, 10 );
-      }
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</COLOR>", &v, &vlen ) )
+        bsBrickLinkXmlParseIntSpan( v, vlen, &item.colorid );
     }
+
+    /* CATEGORY */
     if( ( s = ccStrFindStrSkip( itemstart, "<CATEGORY>" ) ) )
     {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</CATEGORY>" ) )
-      {
-        if( v )
-          item.categoryid = (int)strtol( v, 0, 10 );
-      }
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</CATEGORY>", &v, &vlen ) )
+        bsBrickLinkXmlParseIntSpan( v, vlen, &item.categoryid );
     }
+
+    /* QTY */
     if( ( s = ccStrFindStrSkip( itemstart, "<QTY>" ) ) )
     {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</QTY>" ) )
+      int q = 0;
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</QTY>", &v, &vlen ) )
       {
-        if( v )
-          item.quantity = (int)strtol( v, 0, 10 );
-      }
-    }
-    if( ( s = ccStrFindStrSkip( itemstart, "<PRICE>" ) ) )
-    {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</PRICE>" ) )
-      {
-        if( v )
-          item.price = (float)strtod( v, 0 );
-      }
-    }
-    if( ( s = ccStrFindStrSkip( itemstart, "<BULK>" ) ) )
-    {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</BULK>" ) )
-      {
-        if( v )
-          item.bulk = (int)strtol( v, 0, 10 );
-      }
-    }
-    if( ( s = ccStrFindStrSkip( itemstart, "<LOTID>" ) ) )
-    {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</LOTID>" ) )
-      {
-        if( v )
-          item.lotid = (int64_t)strtoll( v, 0, 10 );
-      }
-    }
-    if( ( s = ccStrFindStrSkip( itemstart, "<MYCOST>" ) ) )
-    {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</MYCOST>" ) )
-      {
-        if( v )
-          item.mycost = (float)strtod( v, 0 );
-      }
-    }
-    if( ( s = ccStrFindStrSkip( itemstart, "<CONDITION>" ) ) )
-    {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</CONDITION>" ) )
-      {
-        if( ( v ) && ( v[0] ) )
-          item.condition = v[0];
+        bsBrickLinkXmlParseIntSpan( v, vlen, &q );
+        item.quantity = q;
       }
     }
 
-    /* DESCRIPTION -> comments (decode entities to be closer to BrickStore) */
+    /* PRICE */
+    if( ( s = ccStrFindStrSkip( itemstart, "<PRICE>" ) ) )
+    {
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</PRICE>", &v, &vlen ) )
+        bsBrickLinkXmlParseFloatSpan( v, vlen, &item.price );
+    }
+
+    /* BULK */
+    if( ( s = ccStrFindStrSkip( itemstart, "<BULK>" ) ) )
+    {
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</BULK>", &v, &vlen ) )
+        bsBrickLinkXmlParseIntSpan( v, vlen, &item.bulk );
+    }
+
+    /* LOTID */
+    if( ( s = ccStrFindStrSkip( itemstart, "<LOTID>" ) ) )
+    {
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</LOTID>", &v, &vlen ) )
+        bsBrickLinkXmlParseInt64Span( v, vlen, &item.lotid );
+    }
+
+    /* MYCOST */
+    if( ( s = ccStrFindStrSkip( itemstart, "<MYCOST>" ) ) )
+    {
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</MYCOST>", &v, &vlen ) )
+        bsBrickLinkXmlParseFloatSpan( v, vlen, &item.mycost );
+    }
+
+    /* CONDITION */
+    if( ( s = ccStrFindStrSkip( itemstart, "<CONDITION>" ) ) )
+    {
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</CONDITION>", &v, &vlen ) )
+        bsBrickLinkXmlParseCharSpan( v, vlen, &item.condition );
+    }
+
+    /* DESCRIPTION -> comments (decode entities) */
     decoded = 0;
+    tmpstr = 0;
     if( ( s = ccStrFindStrSkip( itemstart, "<DESCRIPTION>" ) ) )
     {
-      char *v = 0;
-      if( bsBrickLinkXmlReadString( &v, s, "</DESCRIPTION>" ) )
+      v = 0;
+      vlen = 0;
+      if( bsBrickLinkXmlGetSpan( s, "</DESCRIPTION>", &v, &vlen ) )
       {
-        if( v )
+        if( vlen > 0 )
         {
-          decoded = xmlDecodeEscapeString( v, (int)strlen( v ), &decodedlen );
+          decoded = xmlDecodeEscapeString( v, vlen, &decodedlen );
           if( decoded )
             item.comments = decoded;
           else
-            item.comments = v;
+          {
+            tmpstr = bsBrickLinkXmlCopySpan( v, vlen );
+            item.comments = tmpstr;
+          }
         }
       }
     }
@@ -476,18 +578,24 @@ static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *bod
     /* REMARKS -> remarks (decode entities) */
     {
       char *decoded2 = 0;
+      char *tmpstr2 = 0;
+
       if( ( s = ccStrFindStrSkip( itemstart, "<REMARKS>" ) ) )
       {
-        char *v = 0;
-        if( bsBrickLinkXmlReadString( &v, s, "</REMARKS>" ) )
+        v = 0;
+        vlen = 0;
+        if( bsBrickLinkXmlGetSpan( s, "</REMARKS>", &v, &vlen ) )
         {
-          if( v )
+          if( vlen > 0 )
           {
-            decoded2 = xmlDecodeEscapeString( v, (int)strlen( v ), &decodedlen );
+            decoded2 = xmlDecodeEscapeString( v, vlen, &decodedlen );
             if( decoded2 )
               item.remarks = decoded2;
             else
-              item.remarks = v;
+            {
+              tmpstr2 = bsBrickLinkXmlCopySpan( v, vlen );
+              item.remarks = tmpstr2;
+            }
           }
         }
       }
@@ -495,10 +603,17 @@ static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *bod
       bsxVerifyItem( &item );
       bsxAddCopyItem( inv, &item );
 
+      /* Free temporary allocations (bsxAddCopyItem deep-copies strings) */
+      if( item.id )
+        free( item.id );
       if( decoded )
         free( decoded );
+      else if( tmpstr )
+        free( tmpstr );
       if( decoded2 )
         free( decoded2 );
+      else if( tmpstr2 )
+        free( tmpstr2 );
     }
 
     p = itemend;
@@ -507,6 +622,7 @@ static int bsBrickLinkParseStoreInventoryXml( bsxInventory *inv, const void *bod
   free( buf );
   return 1;
 }
+
 
 static void bsBrickLinkReplyInventoryWebXml( void *uservalue, int resultcode, httpResponse *response )
 {
@@ -635,7 +751,8 @@ static void bsBrickLinkReplyInventoryWebXml( void *uservalue, int resultcode, ht
     else if( ( inv->itemcount ) && !( inv->partcount ) )
     {
       ccFileStore( BS_GLOBAL_PATH "invExcelFinal-last.xml", response->body, response->bodysize, 0 );
-      ioPrintf( &context->output, 0, BSMSG_WARNING "BrickStore fallback returned %d lots but 0 total quantity; dumped raw response to \"" BS_GLOBAL_PATH "invExcelFinal-last.xml\".\n", inv->itemcount );
+      ioPrintf( &context->output, 0, BSMSG_WARNING "BrickStore fallback returned %d lots but 0 total quantity; dumped raw response to \"" BS_GLOBAL_PATH "invExcelFinal-last.xml\".
+", inv->itemcount );
     }
   }
 
