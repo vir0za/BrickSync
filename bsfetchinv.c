@@ -661,6 +661,14 @@ bsxInventory *bsQueryBrickLinkFullState( bsContext *context, bsOrderList *orderl
         else
           bsxFreeInventory( altinv );
       }
+    
+      /* FAIL SAFE: never proceed with an empty BL inventory if BrickStore fallback was configured */
+      if( !( inv->itemcount - inv->itemfreecount ) )
+      {
+        ioPrintf( &context->output, IO_MODEBIT_FLUSH, BSMSG_ERROR
+          "BrickLink API inventory is empty and BrickStore fallback failed. Aborting to avoid syncing an empty inventory.\n" );
+        goto errorstep2; /* frees inv, frees orderlist */
+      }
     }
 
 
