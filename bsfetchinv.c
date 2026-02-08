@@ -635,8 +635,7 @@ static void bsBrickLinkReplyInventoryWebXml( void *uservalue, int resultcode, ht
     else if( ( inv->itemcount ) && !( inv->partcount ) )
     {
       ccFileStore( BS_GLOBAL_PATH "invExcelFinal-last.xml", response->body, response->bodysize, 0 );
-      ioPrintf( &context->output, 0, BSMSG_WARNING "BrickStore fallback returned %d lots but 0 total quantity; dumped raw response to \"" BS_GLOBAL_PATH "invExcelFinal-last.xml\".
-", inv->itemcount );
+      ioPrintf( &context->output, 0, BSMSG_WARNING "BrickStore fallback returned %d lots but 0 total quantity; dumped raw response to \"" BS_GLOBAL_PATH "invExcelFinal-last.xml\".\n", inv->itemcount );
     }
   }
 
