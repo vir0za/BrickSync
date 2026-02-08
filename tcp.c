@@ -853,6 +853,11 @@ tcpLink *tcpConnect( tcpContext *context, char *address, int port, void *userval
     link->sslconnection = SSL_new( context->sslcontext );
     if( !( link->sslconnection ) )
       goto error;
+    
+    /* Enable SNI for hostname-based TLS endpoints (required for CloudFront-style hosts) */
+    if( inet_addr( address ) == INADDR_NONE )
+      SSL_set_tlsext_host_name( link->sslconnection, address );
+    
     SSL_set_fd( link->sslconnection, link->socket );
     link->flags |= TCPLINK_FLAGS_SSL_NEEDCONNECT;
   }
