@@ -428,9 +428,12 @@ bsContext *bsInit( char *statepath, int *retstateloaded )
   ioPrintf( &context->output, IO_MODEBIT_LOGONLY, "LOG: Resolved %s as %s\n", BS_BRICKLINK_WEB_SERVER, context->bricklink.webaddress );
   if( context->bricklink.brickstoretoken )
   {
+    /* For BrickStore inventory fallback: keep hostname (TLS/SNI expects hostname; CDN edges may vary) */
     context->bricklink.accountaddress = strdup( BS_BRICKLINK_ACCOUNT_SERVER );
+    if( !( context->bricklink.accountaddress ) )
+      ioPrintf( &context->output, IO_MODEBIT_FLUSH, BSMSG_WARNING "Failed to allocate hostname for " IO_RED "%s" IO_WHITE " (BrickStore inventory fallback disabled).\\n", BS_BRICKLINK_ACCOUNT_SERVER );
     else
-      ioPrintf( &context->output, IO_MODEBIT_LOGONLY, "LOG: Resolved %s as %s\n", BS_BRICKLINK_ACCOUNT_SERVER, context->bricklink.accountaddress );
+      ioPrintf( &context->output, IO_MODEBIT_LOGONLY, "LOG: Using %s for BrickStore fallback\\n", BS_BRICKLINK_ACCOUNT_SERVER );
   }
   context->brickowl.apiaddress = tcpResolveName( BS_BRICKOWL_API_SERVER, 0 );
   if( !( context->brickowl.apiaddress ) )
@@ -1707,5 +1710,4 @@ int main( int argc, char **argv )
 
   return 1;
 }
-
 
