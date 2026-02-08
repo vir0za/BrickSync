@@ -520,6 +520,102 @@ static void bsBrickLinkReplyInventoryWebXml( void *uservalue, int resultcode, ht
   context = reply->context;
 
   reply->result = resultcode;
+
+  /* Follow BrickLink redirects (BrickStore follows redirects by default; BrickSync does not) */
+  if( ( response ) && ( response->httpcode >= 300 ) && ( response->httpcode < 400 ) && ( response->location ) )
+  {
+    /* Limit redirect chain */
+    if( reply->extid < 8 )
+    {
+      const char *loc = response->location;
+      const char *path = loc;
+      const char *host = BS_BRICKLINK_WEB_SERVER;
+      char *hostalloc = 0;
+      char *pathalloc = 0;
+      const char *p;
+
+      /* Absolute URL? */
+      if( ( !( strncmp( loc, "http://", 7 ) ) ) || ( !( strncmp( loc, "https://", 8 ) ) ) )
+      {
+        p = strstr( loc, "://" );
+        if( p )
+          p += 3;
+        else
+          p = loc;
+
+        /* Split host/path */
+        {
+          const char *slash = strchr( p, '/' );
+          if( slash )
+          {
+            size_t hlen = (size_t)( slash - p );
+            hostalloc = (char *)malloc( hlen + 1 );
+            if( hostalloc )
+            {
+              memcpy( hostalloc, p, hlen );
+              hostalloc[hlen] = 0;
+              host = hostalloc;
+            }
+            path = slash;
+          }
+          else
+          {
+            host = p;
+            path = "/";
+          }
+        }
+      }
+      else if( loc[0] == '/' )
+      {
+        /* already absolute path */
+        path = loc;
+      }
+      else
+      {
+        /* relative path -> make it absolute */
+        pathalloc = ccStrAllocPrintf( "/%s", loc );
+        if( pathalloc )
+          path = pathalloc;
+        else
+          path = loc;
+      }
+
+      /* Schedule follow-up GET */
+      {
+        bsQueryReply *nreply;
+        char *querystring;
+
+        ioPrintf( &context->output, IO_MODEBIT_LOGONLY, "LOG: Following redirect to %s%s%s\n", host, ( path && path[0] == '/' ? "" : "/" ), path );
+
+        querystring = ccStrAllocPrintf(
+          "GET %s HTTP/1.1\r\n"
+          "Host: %s\r\n"
+          "Connection: Keep-Alive\r\n"
+          "User-Agent: BrickSync\r\n"
+          "Accept: */*\r\n"
+          "Accept-Encoding: identity\r\n"
+          "x-bl-tpa-client-id: %s\r\n"
+          "x-bl-session-token: %s\r\n"
+          "\r\n",
+          path, host, BS_BRICKLINK_TPA_CLIENT_ID, ( context->bricklink.sessiontoken ? context->bricklink.sessiontoken : "" )
+        );
+
+        nreply = bsAllocReply( context, BS_QUERY_TYPE_WEBBRICKLINK, reply->extid + 1, 0, reply->opaquepointer );
+        httpAddQuery( context->bricklink.webhttpshttp, querystring, ccStrlen( querystring ), HTTP_QUERY_FLAGS_RETRY, (void *)nreply, bsBrickLinkReplyInventoryWebXml );
+        free( querystring );
+      }
+
+      if( hostalloc )
+        free( hostalloc );
+      if( pathalloc )
+        free( pathalloc );
+
+      /* Treat this intermediate redirect response as success (we'll parse the final response) */
+      reply->result = HTTP_RESULT_SUCCESS;
+      mmListDualAddLast( &context->replylist, reply, offsetof(bsQueryReply,list) );
+      return;
+    }
+  }
   if( ( response ) && ( response->httpcode != 200 ) )
   {
     if( response->httpcode )
@@ -576,6 +672,9 @@ static bsxInventory *bsQueryBrickLinkInventoryBrickStoreFallback( bsContext *con
       "POST /invExcelFinal.asp HTTP/1.1\r\n"
       "Host: %s\r\n"
       "Connection: Keep-Alive\r\n"
+      "User-Agent: BrickSync\r\n"
+      "Accept: */*\r\n"
+      "Accept-Encoding: identity\r\n"
       "Content-Type: application/x-www-form-urlencoded\r\n"
       "x-bl-tpa-client-id: %s\r\n"
       "x-bl-session-token: %s\r\n"
