@@ -611,9 +611,27 @@ static int tcpResolveNameAddr( char *address, int listenflag, in_addr_t *retaddr
   retval = 0;
   if( !( getaddrinfo( address, 0, &hints, &addrhost ) ) )
   {
-    ip = ( (struct sockaddr_in *)addrhost->ai_addr )->sin_addr.s_addr;
-    retval = 1;
-    freeaddrinfo( addrhost );
+    {
+      struct addrinfo *ai;
+      int count = 0;
+      static uint32_t rr = 0;
+
+      for( ai = addrhost ; ai ; ai = ai->ai_next )
+        count++;
+
+      if( count > 0 )
+      {
+        int sel = (int)( rr++ % (uint32_t)count );
+        ai = addrhost;
+        while( ( sel-- > 0 ) && ( ai->ai_next ) )
+          ai = ai->ai_next;
+
+        ip = ( (struct sockaddr_in *)ai->ai_addr )->sin_addr.s_addr;
+        retval = 1;
+      }
+
+      freeaddrinfo( addrhost );
+    }
   }
 
   *retaddr = ip;
