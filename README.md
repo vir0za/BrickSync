@@ -1,4 +1,4 @@
-“This is a fork of BrickSync by Alexis Naveros. This fork adds a BrickLink closed-store inventory fallback.”
+“THis is a fork of https://github.com/ZZJHONS/Bricksync which is a fork of BrickSync by Alexis Naveros. This fork adds a BrickLink closed-store inventory fallback.”
 
 ## Support this fork
 
